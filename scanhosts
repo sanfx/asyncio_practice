@@ -1,0 +1,99 @@
+#!/usr/bin/env python3
+
+import asyncio
+import nmap
+import datetime
+import os
+import socket
+import time
+import subprocess
+
+
+from typing import Awaitable
+
+async def _check_call(cmd: str) -> Awaitable[bool]:
+    """Run a command and return True if successful.
+    
+    Raises:
+        subprocess.CalledProcessError: If command fails with non-zero return code
+    """
+    proc = await asyncio.create_subprocess_shell(
+        cmd,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+    await proc.wait()
+    if proc.returncode:
+        raise subprocess.CalledProcessError(proc.returncode, cmd)
+
+
+async def pinger(ip: str) -> Awaitable[bool]:
+    """
+    Ping this, ping that!
+
+    Args:
+        ip: IP address to ping
+
+    Returns:
+        True if reachable, False otherwise
+    """
+
+    try:
+        # native call
+        await _check_call(f"ping -w 2 {ip}")
+        value = datetime.datetime.now()
+        print(f"{value:%H:%M:%S}   {ip:<13} {get_hostname(ip):<10}")
+        return True
+
+    except subprocess.CalledProcessError:
+        return False
+
+
+def get_hostname(ip_address):
+    try:
+        hostname = socket.gethostbyaddr(ip_address)[0]
+        return hostname
+    except socket.herror as e:
+        try:
+            nm = nmap.PortScanner()
+            nm.scan(ip_address, arguments='-sL')
+            hostname = nm[ip_address].hostname()
+            return hostname
+        except nmap.PortScannerError as e:
+            return None
+    return None
+
+
+def get_my_ip():
+    """
+    Find my IP address
+    :return:
+    """
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.connect(("192.168.1.1", 80))
+    ip = s.getsockname()[0]
+    s.close()
+    return ip
+
+
+async def main():
+    print("-" * 33)
+    print(f"{'Time':<6} {'IP4':^15} {'Hostname':^10}")
+    print("-" * 33)
+    pool_size = 255
+    start = 4
+    # get my IP and compose a base like 192.168.1.xxx
+    ip_parts = get_my_ip().split('.')
+    base_ip = ip_parts[0] + '.' + ip_parts[1] + '.' + ip_parts[2] + '.'
+
+    tasks = [
+            asyncio.create_task(pinger(f"{base_ip}{addr}"))
+            for addr in range(start, pool_size + 1)
+        ]
+
+
+    await asyncio.gather(*tasks)
+
+if __name__ == "__main__":
+    asyncio.run(main())
