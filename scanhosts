@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 
 import asyncio
-import nmap
 import datetime
 import os
 import socket
-import time
 import subprocess
 
 
@@ -55,14 +53,8 @@ def get_hostname(ip_address):
         hostname = socket.gethostbyaddr(ip_address)[0]
         return hostname
     except socket.herror as e:
-        try:
-            nm = nmap.PortScanner()
-            nm.scan(ip_address, arguments='-sL')
-            hostname = nm[ip_address].hostname()
-            return hostname
-        except nmap.PortScannerError as e:
-            return None
-    return None
+        pass
+    return ""
 
 
 def get_my_ip():
@@ -91,7 +83,6 @@ async def main():
             asyncio.create_task(pinger(f"{base_ip}{addr}"))
             for addr in range(start, pool_size + 1)
         ]
-
 
     await asyncio.gather(*tasks)
 
